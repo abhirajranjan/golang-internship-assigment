@@ -34,6 +34,7 @@ func getAllPlayerRankwise(ctx *gin.Context) {
 	if errors.Is(err, model.ErrNoPlayer) {
 		// return empty array of players
 		ctx.JSON(http.StatusOK, players)
+		return
 	} else if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "getAllPlayerRankwise"))
 		return
@@ -55,6 +56,7 @@ func getPlayerByRank(ctx *gin.Context) {
 
 	if rank <= 0 {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", "rank cannot be 0 or negetive"))
+		return
 	}
 
 	// check for player
@@ -65,6 +67,7 @@ func getPlayerByRank(ctx *gin.Context) {
 		return
 	} else if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "getPlayerByRank"))
+		return
 	}
 
 	ctx.JSON(http.StatusOK, player)
@@ -75,8 +78,10 @@ func getRandomPlayer(ctx *gin.Context) {
 	if errors.Is(err, model.ErrNoPlayer) {
 		// not an error if no player; empty response
 		ctx.Status(http.StatusNoContent)
+		return
 	} else if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "getRandomPlayer"))
+		return
 	}
 
 	ctx.JSON(http.StatusOK, player)
@@ -89,11 +94,13 @@ func deletePlayer(ctx *gin.Context) {
 	id, err := strconv.Atoi(id_string)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
 	}
 
 	// id cannot be 0 as it is default for unset
 	if id <= 0 {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", "invalid id"))
+		return
 	}
 
 	err = DB.DeletePlayer(id)
@@ -120,11 +127,13 @@ func createNewPlayer(ctx *gin.Context) {
 	// validates model except id parameter
 	if err := model.Validate(player); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", err.Error()))
+		return
 	}
 
 	// generate a new player and set id for player
 	if err := DB.CreateNewPlayer(&player); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
 	}
 
 	// specifies where new player can be located
@@ -132,12 +141,33 @@ func createNewPlayer(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, player)
 }
 
+// param: id
 func updatePlayer(ctx *gin.Context) {
 	var (
 		id    int
 		name  string
 		score int
 	)
+
+	// player id should be present
+	_id := ctx.Param("id")
+	if _id == "" {
+		ctx.JSON(http.StatusBadRequest, apiError("domain error", "missing id"))
+		return
+	}
+
+	// player id should be integer
+	id, err := strconv.Atoi(_id)
+	if err != nil {
+		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
+		return
+	}
+
+	// player id should be not be <=0
+	if id <= 0 {
+		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
+		return
+	}
 
 	// bind the update request
 	var player map[string]interface{}
@@ -152,36 +182,16 @@ func updatePlayer(ctx *gin.Context) {
 		return
 	}
 
-	// player id should be present
-	_id, ok := player["id"]
-	if !ok {
-		ctx.JSON(http.StatusForbidden, apiError("domain error", "missing id"))
-		return
-	}
-
-	// player id should be integer
-	id, ok = _id.(int)
-	if !ok {
-		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
-		return
-	}
-
-	// player id should be not be <=0
-	if id <= 0 {
-		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
-		return
-	}
-
 	// check if score exists
 	s, ok := player["score"]
 	if ok {
-		ss, ok := s.(int)
+		ss, ok := s.(float64)
 		// score is not integer type
 		if !ok {
 			ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid score"))
 			return
 		}
-		score = ss
+		score = int(ss)
 	}
 
 	// check if name exists
@@ -200,8 +210,10 @@ func updatePlayer(ctx *gin.Context) {
 	// player id requested to update cannot be found
 	if errors.Is(err, model.ErrInvalidPlayer) {
 		ctx.AbortWithStatus(http.StatusNotFound)
+		return
 	} else if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "updatePlayer"))
+		return
 	}
 
 	ctx.JSON(http.StatusOK, resplayer)

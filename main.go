@@ -15,16 +15,12 @@ func main() {
 	DB = memorydb.NewMemoryDB()
 
 	router := gin.Default()
-	player := router.Group("/player")
-	{
-		player.POST("/", createNewPlayer)
-		player.PUT("/:id", updatePlayer)
-		player.DELETE("/:id", deletePlayer)
-
-		player.GET("/", getAllPlayerRankwise)
-		player.GET("/rank/:val", getPlayerByRank)
-		player.GET("/random", getRandomPlayer)
-	}
+	router.POST("/player", createNewPlayer)
+	router.PUT("/player/:id", updatePlayer)
+	router.DELETE("/player/:id", deletePlayer)
+	router.GET("/player", getAllPlayerRankwise)
+	router.GET("/player/rank/:val", getPlayerByRank)
+	router.GET("/player/random", getRandomPlayer)
 
 	router.Run()
 }

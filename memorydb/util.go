@@ -1,9 +1,8 @@
 package memorydb
 
-// insert element el in arr and returns array and insertion postion.
+// insert element el in arr while comparing with cmp and returns array and insertion postion.
 // if multiple el exists, then select that last occurance
-
-func sortedinsert(arr []int, el int) ([]int, int) {
+func sortedinsert(arr []int, cmp int, el int, key func(int) int) ([]int, int) {
 	if len(arr) == 0 {
 		arr = append(arr, el)
 		return arr, 0
@@ -14,7 +13,7 @@ func sortedinsert(arr []int, el int) ([]int, int) {
 	for low < high {
 		mid := (low + high) / 2
 		// get the last occurance of element
-		if arr[mid] >= el {
+		if key(arr[mid]) >= cmp {
 			low = mid + 1
 		} else {
 			high = mid

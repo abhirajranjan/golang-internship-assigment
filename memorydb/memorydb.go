@@ -4,18 +4,15 @@ import (
 	"math/rand"
 	"score/model"
 	"sync"
-)
 
-type playerwithrank struct {
-	player model.Player
-	rank   int // 1 based indexing
-}
+	"github.com/pkg/errors"
+)
 
 type memorydb struct {
 	mu         *sync.RWMutex
-	playerCard map[int]playerwithrank // map of player id to players with rank
-	rank       []int                  // rank of player ids
-	nextid     int                    // next id to give to new player
+	playerCard map[int]model.Player // map of player id to players with rank
+	rank       []int                // rank of player ids
+	nextid     int                  // next id to give to new player
 }
 
 // validates that memorydb implements model.Repo
@@ -24,9 +21,9 @@ var _ model.Repo = (*memorydb)(nil)
 func NewMemoryDB() *memorydb {
 	return &memorydb{
 		mu:         &sync.RWMutex{},
-		playerCard: make(map[int]playerwithrank),
+		playerCard: make(map[int]model.Player),
 		rank:       make([]int, 0),
-		nextid:     0,
+		nextid:     1,
 	}
 }
 
@@ -34,14 +31,18 @@ func (m *memorydb) GetAllPlayerRankwise() ([]model.Player, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if len(m.playerCard) == 0 {
-		return nil, model.ErrNoPlayer
-	}
-
 	players := make([]model.Player, len(m.playerCard))
 
+	if len(m.playerCard) == 0 {
+		return players, model.ErrNoPlayer
+	}
+
 	for pos, id := range m.rank {
-		players[pos] = m.playerCard[id].player
+		p, ok := m.playerCard[id]
+		if !ok {
+			return nil, errors.Errorf("ranging error %d\n\n%#v\n\n%#v", id, m.playerCard, m.rank)
+		}
+		players[pos] = p
 	}
 	return players, nil
 }
@@ -59,34 +60,48 @@ func (m *memorydb) GetPlayerByRank(rank int) (model.Player, error) {
 		return player, model.ErrRankDoensnotExist
 	}
 
-	return m.playerCard[m.rank[pos]].player, nil
+	return m.playerCard[m.rank[pos]], nil
 }
 func (m *memorydb) GetRandomPlayer() (model.Player, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	n := rand.Intn(len(m.rank) - 1)
+	if len(m.rank) == 0 {
+		return model.Player{}, model.ErrNoPlayer
+	}
+
+	n := rand.Intn(len(m.rank))
 	// values in m.players cannot be altered hence safe to return them
-	return m.playerCard[m.rank[n]].player, nil
+	return m.playerCard[m.rank[n]], nil
 }
 func (m *memorydb) DeletePlayer(id int) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	p, ok := m.playerCard[id]
 	if !ok {
 		return model.ErrInvalidPlayer
 	}
 
-	m.mu.Unlock()
 	// player card stores rank with 1 based indexing
-	m.deletePlayerFromRank(p.rank - 1)
-	m.deletePlayerCardbyID(p.player.Id)
+	m.deletePlayerFromRank(p.Id)
+	m.deletePlayerCardbyID(id)
 	return nil
 }
 
-func (m *memorydb) deletePlayerFromRank(rank int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *memorydb) deletePlayerFromRank(id int) {
+	var rank int = len(m.rank)
+
+	for idx, i := range m.rank {
+		if i == id {
+			rank = idx
+			break
+		}
+	}
+
+	if rank == len(m.rank) {
+		return
+	}
 
 	// move every element one step forward
 	copy(m.rank[rank:], m.rank[rank+1:])
@@ -95,40 +110,33 @@ func (m *memorydb) deletePlayerFromRank(rank int) {
 }
 
 func (m *memorydb) deletePlayerCardbyID(id int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	delete(m.playerCard, id)
 }
 
 func (m *memorydb) CreateNewPlayer(p *model.Player) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	var player model.Player
 
 	player.Country = p.Country
 	player.Id = m.nextid
+	p.Id = player.Id
 	m.nextid++
 	player.Name = p.Name
 	player.Score = p.Score
-
-	m.mu.Unlock()
 
 	m.createPlayer(player)
 	return nil
 }
 
 func (m *memorydb) createPlayer(player model.Player) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.rank, _ = sortedinsert(m.rank, player.Score, player.Id, func(rank int) int {
+		card := m.playerCard[rank]
+		return card.Score
+	})
 
-	var rank int
-	m.rank, rank = sortedinsert(m.rank, player.Id)
-
-	m.playerCard[player.Id] = playerwithrank{
-		player: player,
-		rank:   rank + 1,
-	}
+	m.playerCard[player.Id] = player
 }
 
 func (m *memorydb) UpdatePlayer(id int, name string, score int, check map[string]interface{}) (model.Player, error) {
@@ -137,34 +145,33 @@ func (m *memorydb) UpdatePlayer(id int, name string, score int, check map[string
 	)
 
 	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	playerCard, ok := m.playerCard[id]
 	if !ok {
 		return player, model.ErrInvalidPlayer
 	}
 
-	m.mu.Unlock()
-
 	// update the rank only if there is change in scores
-	if playerCard.player.Score != score {
-		m.deletePlayerFromRank(playerCard.rank)
+	if playerCard.Score != score {
+		m.deletePlayerFromRank(playerCard.Id)
 	}
 
 	// remove player card as they are immutable in maps (not referenced type)
-	m.deletePlayerCardbyID(playerCard.player.Id)
+	m.deletePlayerCardbyID(id)
 
 	if _, ok := check["name"]; !ok {
-		name = playerCard.player.Name
+		name = playerCard.Name
 	}
 	if _, ok := check["score"]; !ok {
-		score = playerCard.player.Score
+		score = playerCard.Score
 	}
 
 	player = model.Player{
 		Id:      id,
 		Name:    name,
 		Score:   score,
-		Country: playerCard.player.Country,
+		Country: playerCard.Country,
 	}
 
 	m.createPlayer(player)

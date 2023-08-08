@@ -21,6 +21,15 @@ type memorydb struct {
 // validates that memorydb implements model.Repo
 var _ model.Repo = (*memorydb)(nil)
 
+func NewMemoryDB() *memorydb {
+	return &memorydb{
+		mu:         &sync.RWMutex{},
+		playerCard: make(map[int]playerwithrank),
+		rank:       make([]int, 0),
+		nextid:     0,
+	}
+}
+
 func (m *memorydb) GetAllPlayerRankwise() ([]model.Player, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

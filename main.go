@@ -1,25 +1,18 @@
 package main
 
 import (
-	"flag"
+	"score/memorydb"
 	"score/model"
 
 	"github.com/gin-gonic/gin"
 )
 
 var (
-	// specify if we have redis connection
-	// if unset, memory repo will be used
-	redisConn string
-
 	DB model.Repo
 )
 
 func main() {
-	flag.StringVar(&redisConn, "redis dsn", "", "provide redis dsn. if unset memory database will be used")
-	flag.Parse()
-
-	getDatabase()
+	DB = memorydb.NewMemoryDB()
 
 	router := gin.Default()
 	player := router.Group("/player")
@@ -34,8 +27,4 @@ func main() {
 	}
 
 	router.Run()
-}
-
-func getDatabase() {
-
 }

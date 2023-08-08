@@ -2,25 +2,37 @@ package main
 
 import (
 	"score/memorydb"
-	"score/model"
 
 	"github.com/gin-gonic/gin"
 )
 
-var (
-	DB model.Repo
-)
-
 func main() {
-	DB = memorydb.NewMemoryDB()
+	DB := memorydb.NewMemoryDB()
 
 	router := gin.Default()
-	router.POST("/player", createNewPlayer)
-	router.PUT("/player/:id", updatePlayer)
-	router.DELETE("/player/:id", deletePlayer)
-	router.GET("/player", getAllPlayerRankwise)
-	router.GET("/player/rank/:val", getPlayerByRank)
-	router.GET("/player/random", getRandomPlayer)
+	router.POST("/player", func(ctx *gin.Context) {
+		CreateNewPlayer(ctx, DB)
+	})
+
+	router.PUT("/player/:id", func(ctx *gin.Context) {
+		UpdatePlayer(ctx, DB)
+	})
+
+	router.DELETE("/player/:id", func(ctx *gin.Context) {
+		DeletePlayer(ctx, DB)
+	})
+
+	router.GET("/player", func(ctx *gin.Context) {
+		GetAllPlayerRankwise(ctx, DB)
+	})
+
+	router.GET("/player/rank/:val", func(ctx *gin.Context) {
+		GetPlayerByRank(ctx, DB)
+	})
+
+	router.GET("/player/random", func(ctx *gin.Context) {
+		GetRandomPlayer(ctx, DB)
+	})
 
 	router.Run()
 }

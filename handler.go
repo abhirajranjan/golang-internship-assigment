@@ -22,7 +22,7 @@ type respErrContainer struct {
 	Error respErr `json:"error"`
 }
 
-func getAllPlayerRankwise(ctx *gin.Context) {
+func GetAllPlayerRankwise(ctx *gin.Context, DB model.Repo) {
 	var (
 		players []model.Player
 		err     error
@@ -44,7 +44,7 @@ func getAllPlayerRankwise(ctx *gin.Context) {
 }
 
 // param: val
-func getPlayerByRank(ctx *gin.Context) {
+func GetPlayerByRank(ctx *gin.Context, DB model.Repo) {
 	// extract rank from param val
 	rank_string := ctx.Param("val")
 	rank, err := strconv.Atoi(rank_string)
@@ -73,7 +73,7 @@ func getPlayerByRank(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, player)
 }
 
-func getRandomPlayer(ctx *gin.Context) {
+func GetRandomPlayer(ctx *gin.Context, DB model.Repo) {
 	player, err := DB.GetRandomPlayer()
 	if errors.Is(err, model.ErrNoPlayer) {
 		// not an error if no player; empty response
@@ -88,7 +88,7 @@ func getRandomPlayer(ctx *gin.Context) {
 }
 
 // param: id
-func deletePlayer(ctx *gin.Context) {
+func DeletePlayer(ctx *gin.Context, DB model.Repo) {
 	// get the param id
 	id_string := ctx.Param("id")
 	id, err := strconv.Atoi(id_string)
@@ -116,7 +116,7 @@ func deletePlayer(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func createNewPlayer(ctx *gin.Context) {
+func CreateNewPlayer(ctx *gin.Context, DB model.Repo) {
 	// bind the post data to player
 	var player model.Player
 	if err := ctx.Bind(&player); err != nil {
@@ -142,7 +142,7 @@ func createNewPlayer(ctx *gin.Context) {
 }
 
 // param: id
-func updatePlayer(ctx *gin.Context) {
+func UpdatePlayer(ctx *gin.Context, DB model.Repo) {
 	var (
 		id    int
 		name  string

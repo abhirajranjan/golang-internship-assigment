@@ -49,8 +49,12 @@ func getPlayerByRank(ctx *gin.Context) {
 	rank, err := strconv.Atoi(rank_string)
 	if err != nil {
 		// cannot convert rank to integer
-		ctx.AbortWithStatus(http.StatusBadRequest)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", "rank should be integer"))
 		return
+	}
+
+	if rank <= 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", "rank cannot be 0 or negetive"))
 	}
 
 	// check for player
@@ -60,7 +64,7 @@ func getPlayerByRank(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusNotFound)
 		return
 	} else if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "getPlayerByRank"))
 	}
 
 	ctx.JSON(http.StatusOK, player)
@@ -72,7 +76,7 @@ func getRandomPlayer(ctx *gin.Context) {
 		// not an error if no player; empty response
 		ctx.Status(http.StatusNoContent)
 	} else if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "getRandomPlayer"))
 	}
 
 	ctx.JSON(http.StatusOK, player)
@@ -87,13 +91,18 @@ func deletePlayer(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 	}
 
+	// id cannot be 0 as it is default for unset
+	if id <= 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", "invalid id"))
+	}
+
 	err = DB.DeletePlayer(id)
 	if errors.Is(err, model.ErrInvalidPlayer) {
 		// no user found to delete
 		ctx.AbortWithStatus(http.StatusNotFound)
 		return
 	} else if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "deletePlayer"))
 		return
 	}
 
@@ -104,8 +113,13 @@ func createNewPlayer(ctx *gin.Context) {
 	// bind the post data to player
 	var player model.Player
 	if err := ctx.Bind(&player); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		ctx.AbortWithError(http.StatusBadRequest, errors.Wrap(err, "createNewPlayer"))
 		return
+	}
+
+	// validates model except id parameter
+	if err := model.Validate(player); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, apiError("domain error", err.Error()))
 	}
 
 	// generate a new player and set id for player
@@ -122,7 +136,7 @@ func updatePlayer(ctx *gin.Context) {
 	// bind the update request
 	var player model.Player
 	if err := ctx.Bind(&player); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		ctx.AbortWithError(http.StatusBadRequest, errors.Wrap(err, "updatePlayer: ctx.Bind"))
 		return
 	}
 
@@ -130,8 +144,8 @@ func updatePlayer(ctx *gin.Context) {
 	if player.Country != "" {
 		ctx.JSON(http.StatusForbidden, apiError("domain error", "country cannot be modified"))
 	}
-	// player id cannot be 0 for update
-	if player.Id == 0 {
+	// player id cannot be <=0 for update
+	if player.Id <= 0 {
 		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
 	}
 
@@ -140,7 +154,7 @@ func updatePlayer(ctx *gin.Context) {
 	if errors.Is(err, model.ErrInvalidPlayer) {
 		ctx.AbortWithStatus(http.StatusNotFound)
 	} else if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "updatePlayer"))
 	}
 
 	ctx.JSON(http.StatusOK, player)

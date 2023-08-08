@@ -16,11 +16,6 @@ func Validate(p Player) error {
 	}{
 		// field mandatory checks
 		{
-			// 0 is default if unset;
-			shouldBeTrue: p.Id > 0,
-			ErrifNotTrue: errors.Wrap(ErrInvalidPlayer, "incorrect id"),
-		},
-		{
 			shouldBeTrue: len(p.Name) > 0,
 			ErrifNotTrue: errors.Wrap(ErrInvalidPlayer, "name cannot be empty"),
 		},

@@ -28,8 +28,8 @@ func NewMemoryDB() *memorydb {
 }
 
 func (m *memorydb) GetAllPlayerRankwise() ([]model.Player, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	players := make([]model.Player, len(m.playerCard))
 

@@ -19,7 +19,7 @@ func main() {
 	flag.StringVar(&redisConn, "redis dsn", "", "provide redis dsn. if unset memory database will be used")
 	flag.Parse()
 
-	DB = getDatabase()
+	getDatabase()
 
 	router := gin.Default()
 	player := router.Group("/player")
@@ -36,5 +36,6 @@ func main() {
 	router.Run()
 }
 
-func getDatabase() model.Repo {
+func getDatabase() {
+
 }

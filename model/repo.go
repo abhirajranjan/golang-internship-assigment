@@ -6,5 +6,5 @@ type Repo interface {
 	GetRandomPlayer() (Player, error)
 	DeletePlayer(int) error
 	CreateNewPlayer(*Player) error
-	UpdatePlayer(*Player) error
+	UpdatePlayer(id int, name string, score int, check map[string]interface{}) (Player, error)
 }

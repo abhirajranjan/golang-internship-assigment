@@ -133,23 +133,70 @@ func createNewPlayer(ctx *gin.Context) {
 }
 
 func updatePlayer(ctx *gin.Context) {
+	var (
+		id    int
+		name  string
+		score int
+	)
+
 	// bind the update request
-	var player model.Player
+	var player map[string]interface{}
 	if err := ctx.Bind(&player); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, errors.Wrap(err, "updatePlayer: ctx.Bind"))
 		return
 	}
 
 	// updating country is not allowed
-	if player.Country != "" {
+	if _, ok := player["country"]; ok {
 		ctx.JSON(http.StatusForbidden, apiError("domain error", "country cannot be modified"))
-	}
-	// player id cannot be <=0 for update
-	if player.Id <= 0 {
-		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
+		return
 	}
 
-	err := DB.UpdatePlayer(&player)
+	// player id should be present
+	_id, ok := player["id"]
+	if !ok {
+		ctx.JSON(http.StatusForbidden, apiError("domain error", "missing id"))
+		return
+	}
+
+	// player id should be integer
+	id, ok = _id.(int)
+	if !ok {
+		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
+		return
+	}
+
+	// player id should be not be <=0
+	if id <= 0 {
+		ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid id"))
+		return
+	}
+
+	// check if score exists
+	s, ok := player["score"]
+	if ok {
+		ss, ok := s.(int)
+		// score is not integer type
+		if !ok {
+			ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid score"))
+			return
+		}
+		score = ss
+	}
+
+	// check if name exists
+	n, ok := player["name"]
+	if ok {
+		nn, ok := n.(string)
+		// name is not string type
+		if !ok {
+			ctx.JSON(http.StatusForbidden, apiError("domain error", "invalid name"))
+			return
+		}
+		name = nn
+	}
+
+	resplayer, err := DB.UpdatePlayer(id, name, score, player)
 	// player id requested to update cannot be found
 	if errors.Is(err, model.ErrInvalidPlayer) {
 		ctx.AbortWithStatus(http.StatusNotFound)
@@ -157,7 +204,7 @@ func updatePlayer(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "updatePlayer"))
 	}
 
-	ctx.JSON(http.StatusOK, player)
+	ctx.JSON(http.StatusOK, resplayer)
 }
 
 func apiError(_type, message string) respErrContainer {
